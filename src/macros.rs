@@ -308,11 +308,11 @@ impl Serialize for Macro {
     where
         S: Serializer
     {
-        let actions = self.actions.lock().unwrap().clone();
-        let metadata = self.metadata.lock().unwrap().clone();
+        let actions = self.actions.lock().unwrap();
+        let metadata = self.metadata.lock().unwrap();
         let mut state = serializer.serialize_struct("Macro", 2)?;
-        state.serialize_field("actions", &actions)?;
-        state.serialize_field("metadata", &metadata)?;
+        state.serialize_field("actions", &*actions)?;
+        state.serialize_field("metadata", &*metadata)?;
         state.end()
     }
 }
