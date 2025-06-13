@@ -139,7 +139,7 @@ impl Macro {
             // Record the key up action.
             key_up.lock().unwrap().push(MacroAction {
                 offset: Instant::now().time_since(start),
-                action: UserAction::Key(KeyAction { key: key.to_string(), pressed: false })
+                action: UserAction::Key(KeyAction { key: utils::to_string(key), pressed: false })
             })
         });
 
@@ -147,7 +147,7 @@ impl Macro {
             // Record the key down action.
             key_down.lock().unwrap().push(MacroAction {
                 offset: Instant::now().time_since(start),
-                action: UserAction::Key(KeyAction { key: key.to_string(), pressed: true })
+                action: UserAction::Key(KeyAction { key: utils::to_string(key), pressed: true })
             })
         });
 
