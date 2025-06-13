@@ -286,8 +286,6 @@ impl Macro {
             .expect("Failed to serialize macro");
         if let Err(e) = std::fs::write(path.as_ref(), content) {
             eprintln!("Failed to write macro to file: {}", e);
-        } else {
-            println!("Macro saved successfully.");
         }
     }
 }
