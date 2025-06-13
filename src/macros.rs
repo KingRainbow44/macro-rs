@@ -11,8 +11,8 @@ use crate::utils;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct MouseMoveAction {
-    delta_x: i32,
-    delta_y: i32
+    x: i32,
+    y: i32
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,7 +87,6 @@ pub struct Macro {
 
     start_time: Arc<Mutex<Instant>>,
     is_recording: Arc<Mutex<bool>>,
-    last_pos: Arc<Mutex<(i32, i32)>>,
 
     actions: Arc<Mutex<Vec<MacroAction>>>,
     metadata: Arc<Mutex<MacroMetadata>>
@@ -100,7 +99,6 @@ impl Macro {
             enigo: Enigo::new(&Settings::default()).unwrap(),
             start_time: Arc::new(Mutex::new(Instant::now())),
             is_recording: Arc::new(Mutex::new(false)),
-            last_pos: Arc::new(Mutex::new((0, 0))),
             actions: Arc::new(Mutex::new(vec![])),
             metadata: Arc::new(Mutex::new(MacroMetadata::default()))
         }
@@ -117,22 +115,19 @@ impl Macro {
         self.actions.lock().unwrap().clear();
 
         let start = Instant::now();
-        let listener = DeviceEventsHandler::new(Duration::from_micros(500)).unwrap();
+        let listener = DeviceEventsHandler::new(Duration::from_micros(100)).unwrap();
 
         // Set the starting cursor position.
         let state = DeviceState::new();
         let (x, y) = state.get_mouse().coords;
         // Store the initial cursor position in the metadata.
         self.metadata.lock().unwrap().cursor_pos = (x, y);
-        *self.last_pos.lock().unwrap() = (x, y);
 
         let key_up = self.actions.clone();
         let key_down = self.actions.clone();
         let mouse_up = self.actions.clone();
         let mouse_down = self.actions.clone();
         let mouse_move = self.actions.clone();
-
-        let last_pos = self.last_pos.clone();
 
         // Start listening for device events.
         let key_up_guard = listener.on_key_up(move |key| {
@@ -169,16 +164,10 @@ impl Macro {
 
         let mouse_move_guard = listener.on_mouse_move(move |position| {
             // Record the mouse move action.
-            let mut last_pos = last_pos.lock().unwrap();
-            // Calculate the delta from the last position.
-            let (x, y) = position;
-            let (delta_x, delta_y) = (x - last_pos.0, y - last_pos.1);
-            // Update the last position.
-            *last_pos = (*x, *y);
-
+            let (x, y) = *position;
             mouse_move.lock().unwrap().push(MacroAction {
                 offset: Instant::now().time_since(start),
-                action: UserAction::MouseMove(MouseMoveAction { delta_x, delta_y })
+                action: UserAction::MouseMove(MouseMoveAction { x, y })
             });
         });
 
@@ -232,7 +221,7 @@ impl Macro {
                 .filter(|a| a.offset.eq(&offset)) {
                 match &action.action {
                     UserAction::MouseMove(mouse) => {
-                        self.enigo.move_mouse(mouse.delta_x, mouse.delta_y, Coordinate::Rel).unwrap();
+                        self.enigo.move_mouse(mouse.x, mouse.y, Coordinate::Abs).unwrap();
                     }
                     UserAction::MouseButton(mouse) => {
                         let direction = if mouse.pressed {
@@ -269,7 +258,7 @@ impl Macro {
             }
 
             // Wait for the next millisecond.
-            sleep(Duration::from_micros(500));
+            sleep(Duration::from_micros(100));
         }
     }
 
@@ -297,8 +286,7 @@ impl Clone for Macro {
             metadata: self.metadata.clone(),
             start_time: self.start_time.clone(),
             is_recording: self.is_recording.clone(),
-            actions: self.actions.clone(),
-            last_pos: self.last_pos.clone(),
+            actions: self.actions.clone()
         }
     }
 }
@@ -365,7 +353,6 @@ impl<'de> Visitor<'de> for MacroVisitor {
             enigo: Enigo::new(&Settings::default()).unwrap(),
             start_time: Arc::new(Mutex::new(Instant::now())),
             is_recording: Arc::new(Mutex::new(false)),
-            last_pos: Arc::new(Mutex::new((0, 0))),
             actions: Arc::new(Mutex::new(actions)),
             metadata: Arc::new(Mutex::new(metadata)),
         })
