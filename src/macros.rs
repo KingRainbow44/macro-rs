@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use device_query::{DeviceEvents, DeviceEventsHandler, DeviceQuery, DeviceState, MouseButton};
 use enigo::{Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::de::{SeqAccess, Visitor};
+use serde::de::{MapAccess, Visitor};
 use serde::ser::SerializeStruct;
 use crate::utils;
 
@@ -335,20 +335,22 @@ impl<'de> Visitor<'de> for MacroVisitor {
         formatter.write_str("a macro with actions and metadata")
     }
 
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
     where
-        A: SeqAccess<'de>,
+        A: MapAccess<'de>,
     {
         let mut actions = None;
         let mut metadata = None;
 
-        while let Some(key) = seq.next_element::<String>()? {
+        let mut map = map;
+
+        while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
                 "actions" => {
-                    actions = Some(seq.next_element::<Vec<MacroAction>>()?);
+                    actions = Some(map.next_value::<Vec<MacroAction>>()?);
                 }
                 "metadata" => {
-                    metadata = Some(seq.next_element::<MacroMetadata>()?);
+                    metadata = Some(map.next_value::<MacroMetadata>()?);
                 }
                 _ => return Err(serde::de::Error::unknown_field(&key, &["actions", "metadata"])),
             }
@@ -364,8 +366,8 @@ impl<'de> Visitor<'de> for MacroVisitor {
             start_time: Arc::new(Mutex::new(Instant::now())),
             is_recording: Arc::new(Mutex::new(false)),
             last_pos: Arc::new(Mutex::new((0, 0))),
-            actions: Arc::new(Mutex::new(actions.unwrap())),
-            metadata: Arc::new(Mutex::new(metadata.unwrap())),
+            actions: Arc::new(Mutex::new(actions)),
+            metadata: Arc::new(Mutex::new(metadata)),
         })
     }
 }
@@ -444,6 +446,17 @@ mod test {
         towa.stop_recording();
 
         // Save the macro to a file.
-        towa.save("test_macro.json");
+        towa.save("macro.json");
+    }
+
+    #[test]
+    fn load_macro() {
+        let content = std::fs::read_to_string("macro.json")
+            .expect("failed to read macro file");
+        let mut loaded_macro: Macro = serde_json::from_str(&content)
+            .expect("failed to deserialize macro");
+
+        sleep(Duration::from_secs(1));
+        loaded_macro.playback();
     }
 }
