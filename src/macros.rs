@@ -272,6 +272,24 @@ impl Macro {
             sleep(Duration::from_micros(500));
         }
     }
+
+    /// Saves this macro to the file system.
+    #[cfg(feature = "save")]
+    pub fn save<S: AsRef<str>>(&self, path: S) {
+        if let Some(parent) = std::path::Path::new(path.as_ref()).parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent).expect("Failed to create directory");
+            }
+        }
+
+        let content = serde_json::to_string(self)
+            .expect("Failed to serialize macro");
+        if let Err(e) = std::fs::write(path.as_ref(), content) {
+            eprintln!("Failed to write macro to file: {}", e);
+        } else {
+            println!("Macro saved successfully.");
+        }
+    }
 }
 
 impl Clone for Macro {
@@ -393,7 +411,7 @@ mod test {
     fn serialize_macro() {
         sleep(Duration::from_secs(1));
 
-        let mut towa = Macro::new();
+        let towa = Macro::new();
         let thread_towa = towa.clone();
         std::thread::spawn(move || {
             let _guard = thread_towa.record();
@@ -408,5 +426,26 @@ mod test {
         let serialized = serde_json::to_string(&towa)
             .expect("failed to serialize macro");
         println!("macro: {:?}", serialized);
+    }
+
+    #[test]
+    #[cfg(feature = "save")]
+    fn save_macro() {
+        sleep(Duration::from_secs(1));
+
+        let towa = Macro::new();
+        let thread_towa = towa.clone();
+        std::thread::spawn(move || {
+            let _guard = thread_towa.record();
+            while thread_towa.is_recording() {
+                // Busy wait for the recording to finish.
+            }
+        });
+
+        sleep(Duration::from_secs(3));
+        towa.stop_recording();
+
+        // Save the macro to a file.
+        towa.save("test_macro.json");
     }
 }
