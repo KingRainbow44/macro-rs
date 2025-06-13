@@ -292,11 +292,11 @@ impl Serialize for Macro {
     where
         S: Serializer
     {
-        let actions = self.actions.lock().unwrap();
-        let metadata = self.metadata.lock().unwrap();
+        let actions = self.actions.lock().unwrap().clone();
+        let metadata = self.metadata.lock().unwrap().clone();
         let mut state = serializer.serialize_struct("Macro", 2)?;
-        state.serialize_field("actions", &*actions)?;
-        state.serialize_field("metadata", &*metadata)?;
+        state.serialize_field("actions", &actions)?;
+        state.serialize_field("metadata", &metadata)?;
         state.end()
     }
 }
@@ -387,5 +387,26 @@ mod test {
 
         sleep(Duration::from_secs(2));
         towa.playback();
+    }
+
+    #[test]
+    fn serialize_macro() {
+        sleep(Duration::from_secs(1));
+
+        let mut towa = Macro::new();
+        let thread_towa = towa.clone();
+        std::thread::spawn(move || {
+            let _guard = thread_towa.record();
+            while thread_towa.is_recording() {
+                // Busy wait for the recording to finish.
+            }
+        });
+
+        sleep(Duration::from_secs(3));
+        towa.stop_recording();
+
+        let serialized = serde_json::to_string(&towa)
+            .expect("failed to serialize macro");
+        println!("macro: {:?}", serialized);
     }
 }
